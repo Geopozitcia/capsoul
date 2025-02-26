@@ -50,3 +50,11 @@ def get_style_keyboard():
         [KeyboardButton(text="Скандинавский стиль")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
+
+def get_final_decision_keyboard():
+    buttons = [
+        [KeyboardButton(text="Мне нравятся эти решения")],
+        [KeyboardButton(text="Думаю, мне нужно что-то более индивидуальное")]
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)

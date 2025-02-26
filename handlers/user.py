@@ -1,6 +1,6 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardRemove, FSInputFile
+from aiogram.types import ReplyKeyboardRemove, FSInputFile, InputMediaPhoto
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from keyboards.reply_kb import (
@@ -9,9 +9,11 @@ from keyboards.reply_kb import (
     get_experience_keyboard,
     get_team_keyboard,
     get_date_keyboard,
-    get_style_keyboard
+    get_style_keyboard,
+    get_final_decision_keyboard
 )
 import aiosqlite
+from pathlib import Path
 
 router = Router()
 
@@ -24,6 +26,8 @@ class Form(StatesGroup):
     team = State()
     date = State()
     style = State()
+    show_solutions = State()  # Новое состояние для показа решений
+    final_decision = State()  # Новое состояние для финального решения
 
 
 @router.message(Command("start"))
@@ -149,8 +153,6 @@ async def process_team(message: types.Message, state: FSMContext):
     )
 
 
-
-
 @router.message(Form.date)
 async def process_date(message: types.Message, state: FSMContext):
     date = message.text
@@ -207,8 +209,40 @@ async def process_style(message: types.Message, state: FSMContext):
         )
         await db.commit()
 
+    # Отправляем дополнительные фотографии и описание выбранного стиля
+    images_path = Path("utilits/images")
+    style_images = {
+        "Минимализм": ["example_minimalism1.jpg", "example_minimalism2.jpg", "example_minimalism3.jpg"],
+        "Современная классика": ["example_modern_classic1.jpg", "example_modern_classic2.jpg", "example_modern_classic3.jpg"],
+        "Скандинавский стиль": ["example_scandi1.jpg", "example_scandi2.jpg", "example_scandi3.jpg"]
+    }
+    descriptions = {
+        "Минимализм": "Минимализм — это стиль вне времени для тех, кто ценит порядок, функциональность, чистоту линий и свободу пространства. Ничего лишнего, только комфорт и современный дизайн. Особенно это ценно в нашем современном мире, где много лишних вещей, шума и суеты.",
+        "Современная классика": "Современная классика — это сочетание уюта, мягкости и элегантности. Интерьер, который выглядит стильно сегодня и останется актуальным завтра.",
+        "Скандинавский стиль": "Скандинавский стиль — это выбор для тех, кто ценит натуральные материалы, функциональность и хорошую простоту. В таком доме тепло и легко дышится."
+    }
+
+    media = [InputMediaPhoto(media=FSInputFile(images_path / image_name)) for image_name in style_images[style]]
+    await message.answer_media_group(media=media)
+
+    await message.answer(descriptions[style])
+
+    # Предлагаем выбрать дальнейшее действие
     await message.answer(
-        "Спасибо за ответы! Ваши предпочтения сохранены. Мы свяжемся с вами в ближайшее время.",
+        "Что вы думаете об этих примерах?",
+        reply_markup=get_final_decision_keyboard()
+    )
+    await state.set_state(Form.final_decision)
+
+
+@router.message(Form.final_decision)
+async def final_decision(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    name = message.from_user.full_name
+
+    await message.answer(
+        f"{name}, если хотите узнать, как мы можем адаптировать готовое интерьерное решение именно под вашу планировку и сколько это будет стоить, запишитесь на экспресс-консультацию по видеосвязи с нашим дизайнером.\n"
+        "Это бесплатно и займёт всего 20 минут вашего времени! 😊",
         reply_markup=ReplyKeyboardRemove()
     )
     await state.clear()
