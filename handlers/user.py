@@ -1,6 +1,6 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardRemove
+from aiogram.types import ReplyKeyboardRemove, FSInputFile
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from keyboards.reply_kb import (
@@ -83,7 +83,7 @@ async def process_aim(message: types.Message, state: FSMContext):
     aim = message.text
     await state.update_data(aim=aim)
 
-    if aim == "для себя":
+    if aim == "Для личного проживания":
         await message.answer(
             "Отлично! Дизайн для инвестиций — это всегда про стиль, функциональность и универсальность. Мы поможем сделать ваш объект максимально привлекательным для потенциальных клиентов."
         )
@@ -106,7 +106,7 @@ async def process_experience(message: types.Message, state: FSMContext):
 
     if experience == "Да, был положительный опыт":
         await message.answer(
-            "Прекрасно! Тогда вы уже знаете, как важно доверять профессионалам. Мы постараемся превзойти ваши ожидания."
+            "Прекрасно!\nТогда вы уже знаете, как важно доверять профессионалам. Мы постараемся превзойти ваши ожидания."
         )
     elif experience == "Да, но опыт был неудачным":
         await message.answer(
@@ -129,11 +129,11 @@ async def process_team(message: types.Message, state: FSMContext):
     team = message.text
     await state.update_data(team=team)
 
-    if team == "да":
+    if team == "Да, есть проверенная команда":
         await message.answer(
-            "Это очень хорошо) Слаженная работа с проверенной командой — это уже половина успеха. Мы можем помочь с координацией и рекомендациями!"
+            "Это очень хорошо! Слаженная работа с проверенной командой — это уже половина успеха. Мы можем помочь с координацией и рекомендациями!"
         )
-    elif team == "нет":
+    elif team == "Нет, пока ищу специалистов":
         await message.answer(
             "Не переживайте, мы постараемся помочь с этим."
         )
@@ -149,6 +149,8 @@ async def process_team(message: types.Message, state: FSMContext):
     )
 
 
+
+
 @router.message(Form.date)
 async def process_date(message: types.Message, state: FSMContext):
     date = message.text
@@ -158,9 +160,28 @@ async def process_date(message: types.Message, state: FSMContext):
         "Все понятно! Учтем это. В любом случае наши проекты создаются в самые короткие сроки."
     )
 
+    minimalism_photo = FSInputFile("utilits/images/minimalism.png")
+    modern_classic_photo = FSInputFile("utilits/images/modern_classic.jpg")
+    scandi_photo = FSInputFile("utilits/images/sсandi.jpg")
+
+    await message.answer_photo(
+        photo=minimalism_photo,
+        caption="🎨 Минимализм — для тех, кто ценит простоту, порядок и функциональность."
+    )
+
+    await message.answer_photo(
+        photo=modern_classic_photo,
+        caption="✨ Современная классика — для тех, кто любит элегантность, уют и вечную актуальность."
+    )
+
+    await message.answer_photo(
+        photo=scandi_photo,
+        caption="🪵 Скандинавский стиль — для тех, кто хочет создать светлое, тёплое и комфортное пространство."
+    )
+
     await state.set_state(Form.style)
     await message.answer(
-        "Мы хотели бы предложить вам стиль из нашего каталога капсульных интерьеров. Выберите тот, который вам ближе.",
+        "Мы хотели бы предложить вам стиль из нашего каталога капсульных интерьеров. Выберите тот, который вам ближе:",
         reply_markup=get_style_keyboard()
     )
 

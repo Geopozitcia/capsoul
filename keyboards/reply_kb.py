@@ -9,8 +9,8 @@ async def contact_keyboard():
 
 def get_aim_keyboard():
     buttons = [
-        [KeyboardButton(text="для себя")],
-        [KeyboardButton(text="для бизнеса")]
+        [KeyboardButton(text="Для личного проживания")],
+        [KeyboardButton(text="Для инвестиций (аренда, продажа)")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
@@ -26,9 +26,9 @@ def get_experience_keyboard():
 
 def get_team_keyboard():
     buttons = [
-        [KeyboardButton(text="да")],
-        [KeyboardButton(text="нет")],
-        [KeyboardButton(text="не знаю")]
+        [KeyboardButton(text="Да, есть проверенная команда")],
+        [KeyboardButton(text="Нет, пока ищу специалистов")],
+        [KeyboardButton(text="Еще не думал(а) об этом")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
