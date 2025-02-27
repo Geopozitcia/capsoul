@@ -297,6 +297,22 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
         )
         return
 
+    # Получаем данные пользователя из базы данных
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute("SELECT phone, aim_of_project, past_experience, team_exist, date_of_project, design_preferences FROM users WHERE id = ?", (user_id,))
+        user_data_db = await cursor.fetchone()
+
+    # Формируем данные для события
+    user_data = {
+        "name": callback_query.from_user.full_name,
+        "phone": user_data_db[0] if user_data_db else "Не указан",
+        "aim_of_project": user_data_db[1] if user_data_db else "Не указано",
+        "past_experience": user_data_db[2] if user_data_db else "Не указано",
+        "team_exist": user_data_db[3] if user_data_db else "Не указано",
+        "date_of_project": user_data_db[4] if user_data_db else "Не указано",
+        "design_preferences": user_data_db[5] if user_data_db else "Не указано",
+    }
+
     # Сохраняем дату и время в базу данных
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("""
@@ -306,15 +322,6 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
         await db.commit()
 
     # Добавляем событие в Google Calendar
-    user_data = {
-        "name": callback_query.from_user.full_name,
-        "phone": data.get("phone", "Не указан"),
-        "aim_of_project": data.get("aim_of_project", "Не указано"),
-        "past_experience": data.get("past_experience", "Не указано"),
-        "team_exist": data.get("team_exist", "Не указано"),
-        "date_of_project": data.get("date_of_project", "Не указано"),
-        "design_preferences": data.get("design_preferences", "Не указано"),
-    }
     create_calendar_event(service, user_data, meeting_datetime)
 
     await callback_query.message.answer(

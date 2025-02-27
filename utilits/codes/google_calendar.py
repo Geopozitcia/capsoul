@@ -1,7 +1,11 @@
 import datetime
+import logging
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+
+# Отключаем предупреждение о file_cache
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 
 # Путь к файлу ключа сервисного аккаунта
 SERVICE_ACCOUNT_FILE = "utilits/codes/key.json"
@@ -57,9 +61,15 @@ def is_time_available(service, date, time):
         # Проверяем, пересекается ли выбранное время с существующими событиями
         if (event_start < target_end) and (event_end > target_start):
             if event["summary"] == WORK_SLOT_EVENT_NAME:
+                # Проверяем, нет ли других событий в это время
+                for other_event in events:
+                    other_start = other_event["start"].get("dateTime", other_event["start"].get("date"))
+                    other_end = other_event["end"].get("dateTime", other_event["end"].get("date"))
+                    if (other_start < target_end) and (other_end > target_start) and (other_event["summary"] != WORK_SLOT_EVENT_NAME):
+                        return False  # Время занято другой консультацией
                 return True  # Время доступно для записи
             else:
-                return False  # Время занято другой консультацией
+                return False  # Время занято другим событием
 
     return False  # Нет рабочего слота в это время
 
