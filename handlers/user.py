@@ -21,7 +21,7 @@ import aiosqlite
 from pathlib import Path
 from keyboards.inline_kb import get_time_keyboard
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
-from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event
+from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available
 
 
 router = Router()
@@ -285,7 +285,17 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
 
     data = await state.get_data()
     user_id = callback_query.from_user.id
-    meeting_datetime = f"{data['meeting_date']}T{data['meeting_time']}:00+07:00"  # Формат для Google Calendar (Новосибирск)
+    meeting_date = data['meeting_date']
+    meeting_datetime = f"{meeting_date}T{time}:00+07:00"  # Формат для Google Calendar (Новосибирск)
+
+    # Проверяем доступность времени
+    service = authenticate_google_calendar()
+    if not is_time_available(service, meeting_date, time):
+        await callback_query.message.answer(
+            "К сожалению, это время уже занято или дизайнер не работает в это время. Пожалуйста, выберите другое время.",
+            reply_markup=get_time_keyboard()
+        )
+        return
 
     # Сохраняем дату и время в базу данных
     async with aiosqlite.connect(DB_NAME) as db:
@@ -296,7 +306,6 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
         await db.commit()
 
     # Добавляем событие в Google Calendar
-    service = authenticate_google_calendar()
     user_data = {
         "name": callback_query.from_user.full_name,
         "phone": data.get("phone", "Не указан"),
@@ -309,7 +318,7 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
     create_calendar_event(service, user_data, meeting_datetime)
 
     await callback_query.message.answer(
-        f"Вы записаны на консультацию на {data['meeting_date']} в {data['meeting_time']}.\n"
+        f"Вы записаны на консультацию на {meeting_date} в {time}.\n"
         "Мы свяжемся с вами в ближайшее время для подтверждения.",
         reply_markup=ReplyKeyboardRemove()
     )
