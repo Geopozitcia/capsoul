@@ -1,8 +1,10 @@
 from aiogram import Router, types, F
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardRemove, FSInputFile, InputMediaPhoto
+from aiogram.types import ReplyKeyboardRemove, FSInputFile, InputMediaPhoto, CallbackQuery
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.state import State, StatesGroup 
+from aiogram.filters.callback_data import CallbackData
+
 from keyboards.reply_kb import (
     contact_keyboard,
     get_aim_keyboard,
@@ -12,22 +14,27 @@ from keyboards.reply_kb import (
     get_style_keyboard,
     get_final_decision_keyboard
 )
+
 import aiosqlite
 from pathlib import Path
+from keyboards.inline_kb import get_time_keyboard
+from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
 
 router = Router()
 
 DB_NAME = "CAPSOUL.db"
 
 
-class Form(StatesGroup):
+class Form(StatesGroup): # испольуется как буффер для решений
     aim = State()
     experience = State()
     team = State()
     date = State()
     style = State()
-    show_solutions = State()  # Новое состояние для показа решений
-    final_decision = State()  # Новое состояние для финального решения
+    show_solutions = State()  
+    final_decision = State()  
+    select_date = State()  # Новое состояние для выбора даты
+    select_time = State()  # Новое состояние для выбора времени
 
 
 @router.message(Command("start"))
@@ -209,7 +216,6 @@ async def process_style(message: types.Message, state: FSMContext):
         )
         await db.commit()
 
-    # Отправляем дополнительные фотографии и описание выбранного стиля
     images_path = Path("utilits/images")
     style_images = {
         "Минимализм": ["example_minimalism1.jpg", "example_minimalism2.jpg", "example_minimalism3.jpg"],
@@ -227,7 +233,6 @@ async def process_style(message: types.Message, state: FSMContext):
 
     await message.answer(descriptions[style])
 
-    # Предлагаем выбрать дальнейшее действие
     await message.answer(
         "Что вы думаете об этих примерах?",
         reply_markup=get_final_decision_keyboard()
@@ -243,6 +248,52 @@ async def final_decision(message: types.Message, state: FSMContext):
     await message.answer(
         f"{name}, если хотите узнать, как мы можем адаптировать готовое интерьерное решение именно под вашу планировку и сколько это будет стоить, запишитесь на экспресс-консультацию по видеосвязи с нашим дизайнером.\n"
         "Это бесплатно и займёт всего 20 минут вашего времени! 😊",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
+    # Переходим к выбору даты
+    await state.set_state(Form.select_date)
+    await message.answer(
+        "Пожалуйста, выберите дату консультации:",
+        reply_markup=await SimpleCalendar(locale="ru_RU").start_calendar()
+    )
+
+@router.callback_query(SimpleCalendarCallback.filter(), Form.select_date)
+async def process_calendar(callback_query: CallbackQuery, callback_data: CallbackData, state: FSMContext):
+    selected, date = await SimpleCalendar(locale="ru_RU").process_selection(callback_query, callback_data)
+    if selected:
+        await state.update_data(meeting_date=date.strftime("%Y-%m-%d"))  # Сохраняем дату
+        await callback_query.message.answer(f"Вы выбрали дату: {date.strftime('%d.%m.%Y')}")
+
+        # Переходим к выбору времени
+        await state.set_state(Form.select_time)
+        await callback_query.message.answer(
+            "Теперь выберите время консультации:",
+            reply_markup=get_time_keyboard()
+        )
+
+
+# Обработка выбора времени
+@router.callback_query(Form.select_time, F.data.startswith("time_"))
+async def process_time(callback_query: CallbackQuery, state: FSMContext):
+    time = callback_query.data.split("_")[1]  # Получаем время из callback_data
+    await state.update_data(meeting_time=time)  # Сохраняем время
+
+    data = await state.get_data()
+    user_id = callback_query.from_user.id
+    meeting_datetime = f"{data['meeting_date']} {data['meeting_time']}"
+
+    # Сохраняем дату и время в базу данных
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("""
+            UPDATE users SET meeting_date = ? WHERE id = ?""",
+            (meeting_datetime, user_id)
+        )
+        await db.commit()
+
+    await callback_query.message.answer(
+        f"Вы записаны на консультацию на {data['meeting_date']} в {data['meeting_time']}.\n"
+        "Мы свяжемся с вами в ближайшее время для подтверждения.",
         reply_markup=ReplyKeyboardRemove()
     )
     await state.clear()
