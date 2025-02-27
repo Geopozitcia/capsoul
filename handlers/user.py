@@ -4,6 +4,8 @@ from aiogram.types import ReplyKeyboardRemove, FSInputFile, InputMediaPhoto, Cal
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup 
 from aiogram.filters.callback_data import CallbackData
+import datetime
+
 
 from keyboards.reply_kb import (
     contact_keyboard,
@@ -19,6 +21,8 @@ import aiosqlite
 from pathlib import Path
 from keyboards.inline_kb import get_time_keyboard
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
+from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event
+
 
 router = Router()
 
@@ -281,7 +285,7 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
 
     data = await state.get_data()
     user_id = callback_query.from_user.id
-    meeting_datetime = f"{data['meeting_date']} {data['meeting_time']}"
+    meeting_datetime = f"{data['meeting_date']}T{data['meeting_time']}:00+07:00"  # Формат для Google Calendar (Новосибирск)
 
     # Сохраняем дату и время в базу данных
     async with aiosqlite.connect(DB_NAME) as db:
@@ -290,6 +294,19 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
             (meeting_datetime, user_id)
         )
         await db.commit()
+
+    # Добавляем событие в Google Calendar
+    service = authenticate_google_calendar()
+    user_data = {
+        "name": callback_query.from_user.full_name,
+        "phone": data.get("phone", "Не указан"),
+        "aim_of_project": data.get("aim_of_project", "Не указано"),
+        "past_experience": data.get("past_experience", "Не указано"),
+        "team_exist": data.get("team_exist", "Не указано"),
+        "date_of_project": data.get("date_of_project", "Не указано"),
+        "design_preferences": data.get("design_preferences", "Не указано"),
+    }
+    create_calendar_event(service, user_data, meeting_datetime)
 
     await callback_query.message.answer(
         f"Вы записаны на консультацию на {data['meeting_date']} в {data['meeting_time']}.\n"
