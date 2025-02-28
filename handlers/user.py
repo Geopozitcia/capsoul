@@ -275,11 +275,11 @@ async def process_calendar(callback_query: CallbackQuery, callback_data: Callbac
         if date.date() < now.date() or (date.date() == now.date() and date.time() < now.time()):
             await callback_query.message.answer(
                 "Вы выбрали прошедшую дату или время. Пожалуйста, выберите будущую дату.",
-                reply_markup=await SimpleCalendar(locale="ru_RU").start_calendar()  # Показываем календарь снова
+                reply_markup=await SimpleCalendar(locale="ru_RU").start_calendar()  
             )
             return
 
-        await state.update_data(meeting_date=date.strftime("%Y-%m-%d"))  # Сохраняем дату
+        await state.update_data(meeting_date=date.strftime("%Y-%m-%d"))  
 
         await callback_query.message.delete()
 
@@ -295,7 +295,6 @@ async def process_calendar(callback_query: CallbackQuery, callback_data: Callbac
             )
             return
 
-        # Переходим к выбору времени
         await state.set_state(Form.select_time)
         await callback_query.message.answer(
             "Теперь выберите время консультации:",
@@ -552,19 +551,22 @@ async def save_file_from_menu(message: types.Message, state: FSMContext):
 
     if message.document:
         file_id = message.document.file_id
-        file_name = message.document.file_name  
+        file_name = message.document.file_name  # Оригинальное имя файла
     else:
         file_id = message.photo[-1].file_id
-        file_name = f"photo_{file_id}.jpg"  
+        file_name = f"photo_{file_id}.jpg"  # Если это фото, создаем имя на основе file_id
 
     file = await message.bot.get_file(file_id)
     file_path = file.file_path
 
+    # Создаем папку для пользователя, если она еще не существует
     user_folder = Path(f"storage/user_files_{user_id}")
     user_folder.mkdir(parents=True, exist_ok=True)
 
+    # Сохраняем файл в папку пользователя с оригинальным именем
     await message.bot.download_file(file_path, user_folder / file_name)
 
+    # Сохраняем название папки в базу данных
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("""
             UPDATE users SET planning_file = ? WHERE id = ?""",
@@ -574,7 +576,7 @@ async def save_file_from_menu(message: types.Message, state: FSMContext):
 
     await message.answer(
         "Файл успешно сохранён. Хотите ли вы прикрепить ещё файлы?",
-        reply_markup=get_more_files_keyboard()
+        reply_markup=get_more_files_keyboard()  # Предлагаем добавить еще файлы
     )
 
 
@@ -589,3 +591,11 @@ async def more_files_no_from_menu(message: types.Message, state: FSMContext):
         reply_markup=get_main_menu_keyboard()
     )
     await state.clear()
+
+
+@router.message(Form.add_planning, F.text == "Да")
+async def more_files_yes_from_menu(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Пожалуйста, отправьте следующий файл.",
+        reply_markup=ReplyKeyboardRemove()  # Убираем reply-кнопки
+    )
