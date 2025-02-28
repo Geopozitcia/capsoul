@@ -7,6 +7,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
 
 
+
 import os
 from pathlib import Path
 import datetime
@@ -42,6 +43,8 @@ class Form(StatesGroup):
     add_planning = State()
 
 
+ADMIN_ID = 665730970
+
 @router.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
@@ -59,7 +62,12 @@ async def start_handler(message: types.Message, state: FSMContext):
                 VALUES (?, ?, ?, ?)""", (user_id, name, username, ""))
             await db.commit()
 
-        if not user or not user[1]:
+        if user_id == ADMIN_ID:
+            await message.answer(
+                "Здравствуйте, Алевтина!",
+                reply_markup=admin_panel()
+            )
+        elif not user or not user[1]:
             await message.answer(
                 f"Здравствуйте, {name}! Меня зовут Капсула, я ваш умный помощник из студии дизайна интерьеров Capsoul.\n\n"
                 f"Для начала запишем ваш номер телефона. Он нужен только для связи с вами.\nОбещаем - спама не будет",
@@ -68,7 +76,7 @@ async def start_handler(message: types.Message, state: FSMContext):
         else:
             await message.answer(
                 f"Здравствуйте, {name}. Что вы хотите сделать?",
-                reply_markup=get_main_menu_keyboard()  # inline кнопки для пользователей которые уже завершили работу с ботом
+                reply_markup=get_main_menu_keyboard()
             )
 
 

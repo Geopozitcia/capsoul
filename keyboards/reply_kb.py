@@ -72,3 +72,10 @@ def get_continue_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
+def get_confirmation_keyboard():
+    buttons = [
+        [KeyboardButton(text="Сохранить")],
+        [KeyboardButton(text="Изменить")],
+        [KeyboardButton(text="Отменить")]
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)

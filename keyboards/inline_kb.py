@@ -60,3 +60,14 @@ def get_main_menu_keyboard():
         [InlineKeyboardButton(text="Задать вопрос", callback_data="ask_question")]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+def admin_panel():
+    """Создает клавиатуру для админа."""
+    buttons = [
+        [InlineKeyboardButton(text="Статистика", callback_data="get_statistic")],
+        [InlineKeyboardButton(text="Отправить напоминание", callback_data="send_remainder")],
+        [InlineKeyboardButton(text="Синхронизация БД", callback_data="sync_database")],
+        [InlineKeyboardButton(text="Планировки", callback_data="get_planfiles")],
+        [InlineKeyboardButton(text="Календарь/GSheets", callback_data="get_links")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
