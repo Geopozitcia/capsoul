@@ -54,24 +54,32 @@ def is_time_available(service, date, time):
     target_start = f"{date}T{time}:00+07:00"
     target_end = (datetime.datetime.fromisoformat(target_start) + datetime.timedelta(hours=1)).isoformat()
 
+    # Проверяем, есть ли рабочий слот, который покрывает выбранное время
+    has_work_slot = False
     for event in events:
         event_start = event["start"].get("dateTime", event["start"].get("date"))
         event_end = event["end"].get("dateTime", event["end"].get("date"))
 
-        # Проверяем, пересекается ли выбранное время с существующими событиями
-        if (event_start < target_end) and (event_end > target_start):
-            if event["summary"] == WORK_SLOT_EVENT_NAME:
-                # Проверяем, нет ли других событий в это время
-                for other_event in events:
-                    other_start = other_event["start"].get("dateTime", other_event["start"].get("date"))
-                    other_end = other_event["end"].get("dateTime", other_event["end"].get("date"))
-                    if (other_start < target_end) and (other_end > target_start) and (other_event["summary"] != WORK_SLOT_EVENT_NAME):
-                        return False  # Время занято другой консультацией
-                return True  # Время доступно для записи
-            else:
+        if event["summary"] == WORK_SLOT_EVENT_NAME:
+            # Проверяем, полностью ли выбранное время находится внутри рабочего слота
+            if event_start <= target_start and event_end >= target_end:
+                has_work_slot = True
+                break
+
+    if not has_work_slot:
+        return False  # Нет рабочего слота, покрывающего выбранное время
+
+    # Проверяем, нет ли других событий, которые пересекаются с выбранным временем
+    for event in events:
+        event_start = event["start"].get("dateTime", event["start"].get("date"))
+        event_end = event["end"].get("dateTime", event["end"].get("date"))
+
+        if event["summary"] != WORK_SLOT_EVENT_NAME:
+            # Проверяем, пересекается ли выбранное время с другими событиями
+            if (event_start < target_end) and (event_end > target_start):
                 return False  # Время занято другим событием
 
-    return False  # Нет рабочего слота в это время
+    return True  # Время доступно для записи
 
 def find_nearest_available_day(service):
     """Находит ближайший день с рабочими слотами."""

@@ -318,15 +318,6 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
     meeting_date = data['meeting_date']
     meeting_datetime = f"{meeting_date}T{time}:00+07:00"  # Формат для Google Calendar (Новосибирск)
 
-    # Проверяем доступность времени
-    service = authenticate_google_calendar()
-    if not is_time_available(service, meeting_date, time):
-        await callback_query.message.answer(
-            "К сожалению, это время уже занято или дизайнер не работает в это время. Пожалуйста, выберите другое время.",
-            reply_markup=get_time_keyboard(meeting_date)  # Показываем клавиатуру с доступным временем
-        )
-        return
-
     # Получаем данные пользователя из базы данных
     async with aiosqlite.connect(DB_NAME) as db:
         cursor = await db.execute("SELECT phone, aim_of_project, past_experience, team_exist, date_of_project, design_preferences FROM users WHERE id = ?", (user_id,))
@@ -352,6 +343,7 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
         await db.commit()
 
     # Добавляем событие в Google Calendar
+    service = authenticate_google_calendar()
     create_calendar_event(service, user_data, meeting_datetime)
 
     await callback_query.message.answer(
