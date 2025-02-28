@@ -7,7 +7,6 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
 
 
-
 import os
 from pathlib import Path
 import datetime

@@ -1,8 +1,6 @@
-
-from keyboards.inline_kb import admin_panel
 from aiogram import Bot, Router, types, F
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message, FSInputFile, ReplyKeyboardRemove
 from aiogram.fsm.state import State, StatesGroup
 from models.database import DB_NAME
 import aiosqlite
@@ -11,6 +9,11 @@ import asyncio
 from pathlib import Path
 from keyboards.reply_kb import get_more_files_keyboard, get_confirmation_keyboard
 from keyboards.inline_kb import admin_panel
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import logging
+import sqlite3
+
 
 router = Router()
 
@@ -200,3 +203,46 @@ async def send_remainder_to_all(bot: Bot, text: str, delay: float, photo_path: s
                     await bot.send_message(user_id, text)
             except Exception as e:
                 print(f"Не удалось отправить сообщение пользователю {user_id}: {e}")
+
+def sync_database_to_google_sheets_sync():
+    """Синхронная версия функции синхронизации."""
+    try:
+        # Настройка аутентификации
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name("utilits/codes/key.json", scope)
+        client = gspread.authorize(creds)
+
+        # Открываем таблицу по ID
+        sheet = client.open_by_key("1jFnTiutAYa1C1PQV0VnYgtu-q033aKdnIs1WVBQrxOk")
+        worksheet = sheet.get_worksheet(0)  # Выбираем первый лист
+
+        # Очищаем лист перед записью новых данных
+        worksheet.clear()
+
+        # Читаем данные из базы данных
+        with sqlite3.connect(DB_NAME) as db:
+            cursor = db.execute("SELECT * FROM users")
+            users = cursor.fetchall()
+
+            # Записываем заголовки столбцов
+            headers = ["ID", "Name", "Phone", "Username", "Aim of Project", "Past Experience", "Team Exist", "Date of Project", "Design Preferences", "Meeting Date", "Planning File"]
+            worksheet.append_row(headers)
+
+            # Записываем данные
+            for user in users:
+                worksheet.append_row(user)
+    except Exception as e:
+        raise e
+
+async def sync_database_to_google_sheets():
+    """Асинхронная обертка для синхронной функции."""
+    await asyncio.to_thread(sync_database_to_google_sheets_sync)
+
+@router.callback_query(lambda c: c.data == "sync_database")
+async def sync_database_handler(callback_query: types.CallbackQuery):
+    try:
+        await sync_database_to_google_sheets()
+        await callback_query.message.answer("База данных успешно синхронизирована с Google Таблицей.", reply_markup=admin_panel())
+    except Exception as e:
+        logging.error(f"Ошибка при синхронизации: {e}", exc_info=True)
+        await callback_query.message.answer(f"Ошибка при синхронизации: {e}", reply_markup=admin_panel())
