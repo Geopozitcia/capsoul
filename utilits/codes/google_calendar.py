@@ -73,6 +73,16 @@ def is_time_available(service, date, time):
 
     return False  # Нет рабочего слота в это время
 
+def find_nearest_available_day(service):
+    """Находит ближайший день с рабочими слотами."""
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  # Текущее время в Новосибирске
+    for delta in range(0, 30):  # Проверяем ближайшие 30 дней
+        target_date = (now + datetime.timedelta(days=delta)).strftime("%Y-%m-%d")
+        events = get_events_for_date(service, target_date)
+        if any(event["summary"] == WORK_SLOT_EVENT_NAME for event in events):
+            return target_date
+    return None
+
 
 def create_calendar_event(service, user_data, meeting_datetime):
     """Создание события в Google Calendar."""
@@ -93,7 +103,7 @@ def create_calendar_event(service, user_data, meeting_datetime):
             "timeZone": TIME_ZONE,
         },
         "end": {
-            "dateTime": (datetime.datetime.fromisoformat(meeting_datetime) + datetime.timedelta(hours=1)).isoformat(),
+            "dateTime": (datetime.datetime.fromisoformat(meeting_datetime) + datetime.timedelta(minutes=30)).isoformat(),
             "timeZone": TIME_ZONE,
         },
         "reminders": {

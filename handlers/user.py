@@ -21,7 +21,7 @@ import aiosqlite
 from pathlib import Path
 from keyboards.inline_kb import get_time_keyboard
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
-from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available
+from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
 
 
 router = Router()
@@ -249,11 +249,23 @@ async def final_decision(message: types.Message, state: FSMContext):
     data = await state.get_data()
     name = message.from_user.full_name
 
-    await message.answer(
-        f"{name}, если хотите узнать, как мы можем адаптировать готовое интерьерное решение именно под вашу планировку и сколько это будет стоить, запишитесь на экспресс-консультацию по видеосвязи с нашим дизайнером.\n"
-        "Это бесплатно и займёт всего 20 минут вашего времени! 😊",
-        reply_markup=ReplyKeyboardRemove()
-    )
+    # Находим ближайший доступный день
+    service = authenticate_google_calendar()
+    nearest_day = find_nearest_available_day(service)
+    if nearest_day:
+        nearest_day_formatted = datetime.datetime.strptime(nearest_day, "%Y-%m-%d").strftime("%d.%m.%Y")
+        await message.answer(
+            f"{name}, если хотите узнать, как мы можем адаптировать готовое интерьерное решение именно под вашу планировку и сколько это будет стоить, запишитесь на экспресс-консультацию по видеосвязи с нашим дизайнером.\n"
+            f"Это бесплатно и займёт всего 20 минут вашего времени! 😊\n\n"
+            f"Ближайший доступный день: {nearest_day_formatted}.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+    else:
+        await message.answer(
+            "К сожалению, ближайшие 30 дней дизайнер не работает. Пожалуйста, свяжитесь с нами позже.",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return
 
     # Переходим к выбору даты
     await state.set_state(Form.select_date)
@@ -266,16 +278,34 @@ async def final_decision(message: types.Message, state: FSMContext):
 async def process_calendar(callback_query: CallbackQuery, callback_data: CallbackData, state: FSMContext):
     selected, date = await SimpleCalendar(locale="ru_RU").process_selection(callback_query, callback_data)
     if selected:
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  # Текущее время в Новосибирске
+        if date.date() < now.date() or (date.date() == now.date() and date.time() < now.time()):
+            await callback_query.message.answer(
+                "Вы выбрали прошедшую дату или время. Пожалуйста, выберите будущую дату.",
+                reply_markup=await SimpleCalendar(locale="ru_RU").start_calendar()  # Показываем календарь снова
+            )
+            return
+
         await state.update_data(meeting_date=date.strftime("%Y-%m-%d"))  # Сохраняем дату
-        await callback_query.message.answer(f"Вы выбрали дату: {date.strftime('%d.%m.%Y')}")
+
+        # Проверяем, есть ли рабочие слоты в выбранный день
+        service = authenticate_google_calendar()
+        events = get_events_for_date(service, date.strftime("%Y-%m-%d"))
+        has_work_slots = any(event["summary"] == WORK_SLOT_EVENT_NAME for event in events)
+
+        if not has_work_slots:
+            await callback_query.message.answer(
+                "В выбранный день дизайнер не работает. Пожалуйста, выберите другой день.",
+                reply_markup=await SimpleCalendar(locale="ru_RU").start_calendar()  # Показываем календарь снова
+            )
+            return
 
         # Переходим к выбору времени
         await state.set_state(Form.select_time)
         await callback_query.message.answer(
             "Теперь выберите время консультации:",
-            reply_markup=get_time_keyboard()
+            reply_markup=get_time_keyboard(date.strftime("%Y-%m-%d"))
         )
-
 
 # Обработка выбора времени
 @router.callback_query(Form.select_time, F.data.startswith("time_"))
@@ -293,7 +323,7 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
     if not is_time_available(service, meeting_date, time):
         await callback_query.message.answer(
             "К сожалению, это время уже занято или дизайнер не работает в это время. Пожалуйста, выберите другое время.",
-            reply_markup=get_time_keyboard()
+            reply_markup=get_time_keyboard(meeting_date)  # Показываем клавиатуру с доступным временем
         )
         return
 
