@@ -1,4 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+import datetime
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
 
 def get_time_keyboard(date):
     """Создает клавиатуру с доступным временем."""
