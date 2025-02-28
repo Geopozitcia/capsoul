@@ -40,7 +40,7 @@ def get_time_keyboard(date):
                     available_times.append(time)
                     break
 
-    # Создаем кнопки для доступного времени
+    # Создаем кнопки для доступного времениb
     buttons = []
     for i in range(0, len(available_times), 2):  # Разделяем на два столбца
         row = [
