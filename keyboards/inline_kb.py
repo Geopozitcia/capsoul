@@ -1,7 +1,4 @@
-import datetime
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
-
 
 def get_time_keyboard(date):
     """Создает клавиатуру с доступным временем."""
@@ -40,7 +37,7 @@ def get_time_keyboard(date):
                     available_times.append(time)
                     break
 
-    # Создаем кнопки для доступного времениb
+    # Создаем кнопки для доступного времени
     buttons = []
     for i in range(0, len(available_times), 2):  # Разделяем на два столбца
         row = [
@@ -51,4 +48,14 @@ def get_time_keyboard(date):
         ]
         buttons.append(row)
 
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_main_menu_keyboard():
+    """Создает клавиатуру с основными действиями."""
+    buttons = [
+        [InlineKeyboardButton(text="Моя консультация", callback_data="my_consultation")],
+        [InlineKeyboardButton(text="Добавить планировку", callback_data="add_planning")],
+        [InlineKeyboardButton(text="Задать вопрос", callback_data="ask_question")]
+    ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)

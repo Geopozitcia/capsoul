@@ -122,3 +122,183 @@ For a description of the Bot API, see this page: https://core.telegram.org/bots/
 "
 
 
+--- 
+Отлично. Давай немного доработаем бота. Теперь когда пользователь заканчивет работу с ботом и нажимает кнопку "продолжить" он видит сообщение "Здравствуйте, {имя}. Что вы хотите сделать?"
+
+Под это сообщение нужно добавить новые inline кнопки:
+1) Кнопка - Моя консультация
+Кнопка выводит информацию о будущей консультации:
+«{Имя пользователя}, вы записаны на экспресс-консультацию с ведущим дизайнером Алевтина.
+Дата консультации {дата}, в {время консультации}.
+
+Созвон пройдёт через Яндекс Телемост. Вам не нужно ничего
+устанавливать — просто перейдите по ссылке в указанное время:
+[ссылку я добавлю позже сам].
+
+Если у вас появятся вопросы до консультации, вы можете оставвить сообщение в соответсвующей вкладке. До встречи! 😊
+2) Кнопка - добавить планировку
+Позволяет пользователю добавить файлы если он не сделал этого раньше, или у него появились новые файлы. Соответсвенно бот снова переходит на стадию принятия файлов. Если у пользователя уже есть личная папка в /storage - туда дозагружаются новые файлы. Если он прикрепляет файлы впервые то для него создается новая папка.
+
+3)кнопка  - Задать вопрос
+Я создал чат куда добавил бота как администратора. Ссылка на чат: https://t.me/+_wLHsinerAAwN2Uy. Я хочу что бы когда пользователь нажимал эту кнопку бот принимал у него сообщение и пересылал его в этот чат в формате:
+
+Пользователь {имя пользователя} спрашивает {текст сообщения}.
+Телефон: {номер телефона пользовтеля}.
+Никнейм пользователя: {usermane}
+
+Эти кнопки нужно реализвать в файле keyboards/inline_kb.py. Сейчас этот файл выглядит так: 
+import datetime
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
+
+
+def get_time_keyboard(date):
+    """Создает клавиатуру с доступным временем."""
+    service = authenticate_google_calendar()
+    events = get_events_for_date(service, date)
+
+    # Все возможные временные слоты
+    all_times = [
+        "13:00", "13:30", "14:00", "14:30", "15:00", "15:30",
+        "16:00", "16:30", "17:00", "17:30", "18:00", "18:30"
+    ]
+
+    # Фильтруем доступное время
+    available_times = []
+    for time in all_times:
+        target_start = f"{date}T{time}:00+07:00"
+        target_end = (datetime.datetime.fromisoformat(target_start) + datetime.timedelta(minutes=30)).isoformat()
+
+        is_available = True
+        for event in events:
+            event_start = event["start"].get("dateTime", event["start"].get("date"))
+            event_end = event["end"].get("dateTime", event["end"].get("date"))
+
+            # Проверяем, пересекается ли выбранное время с существующими событиями
+            if (event_start < target_end) and (event_end > target_start):
+                if event["summary"] != WORK_SLOT_EVENT_NAME:
+                    is_available = False
+                    break
+
+        # Проверяем, есть ли рабочий слот в это время
+        if is_available:
+            for event in events:
+                event_start = event["start"].get("dateTime", event["start"].get("date"))
+                event_end = event["end"].get("dateTime", event["end"].get("date"))
+                if (event_start <= target_start) and (event_end >= target_end) and (event["summary"] == WORK_SLOT_EVENT_NAME):
+                    available_times.append(time)
+                    break
+
+    # Создаем кнопки для доступного времениb
+    buttons = []
+    for i in range(0, len(available_times), 2):  # Разделяем на два столбца
+        row = [
+            InlineKeyboardButton(text=available_times[i], callback_data=f"time_{available_times[i]}"),
+            InlineKeyboardButton(text=available_times[i + 1], callback_data=f"time_{available_times[i + 1]}")
+        ] if i + 1 < len(available_times) else [
+            InlineKeyboardButton(text=available_times[i], callback_data=f"time_{available_times[i]}")
+        ]
+        buttons.append(row)
+
+    return InlineKeyboardMarkup(inline_keyboard=buttons).
+
+    После всех действий с копками бот должен вернуть пользователя к состоянию сообщения "Здравствуйте, {имя}. Что вы хотите сделать?"
+
+
+---
+все еще есть проблемы:
+1) Отправка сообщений в чат - не работат. Появляется ошибка:
+TelegramBadRequest: Telegram server says - Bad Request: chat not found
+Traceback (most recent call last):
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/dispatcher.py", line 309, in _process_update
+    response = await self.feed_update(bot, update, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/dispatcher.py", line 158, in feed_update
+    response = await self.update.wrap_outer_middleware(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<7 lines>...
+    )
+    ^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/middlewares/error.py", line 25, in __call__
+    return await handler(event, data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/middlewares/user_context.py", line 56, in __call__
+    return await handler(event, data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/fsm/middleware.py", line 42, in __call__
+    return await handler(event, data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/event/telegram.py", line 121, in trigger
+    return await wrapped_inner(event, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/event/handler.py", line 43, in call
+    return await wrapped()
+           ^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/dispatcher.py", line 276, in _listen_update
+    return await self.propagate_event(update_type=update_type, event=event, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/router.py", line 146, in propagate_event
+    return await observer.wrap_outer_middleware(_wrapped, event=event, data=kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/router.py", line 141, in _wrapped
+    return await self._propagate_event(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        observer=observer, update_type=update_type, event=telegram_event, **data
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/router.py", line 174, in _propagate_event
+    response = await router.propagate_event(update_type=update_type, event=event, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/router.py", line 146, in propagate_event
+    return await observer.wrap_outer_middleware(_wrapped, event=event, data=kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/router.py", line 141, in _wrapped
+    return await self._propagate_event(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        observer=observer, update_type=update_type, event=telegram_event, **data
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/router.py", line 166, in _propagate_event
+    response = await observer.trigger(event, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/event/telegram.py", line 121, in trigger
+    return await wrapped_inner(event, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/dispatcher/event/handler.py", line 43, in call
+    return await wrapped()
+           ^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/handlers/user.py", line 554, in process_question
+    await message.bot.send_message(
+    ...<4 lines>...
+    )
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/client/bot.py", line 2972, in send_message
+    return await self(call, request_timeout=request_timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/client/bot.py", line 498, in __call__
+    return await self.session(self, method, timeout=request_timeout)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/client/session/base.py", line 254, in __call__
+    return cast(TelegramType, await middleware(bot, method))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/client/session/aiohttp.py", line 185, in make_request
+    response = self.check_response(
+        bot=bot, method=method, status_code=resp.status, content=raw_result
+    )
+  File "/Users/ilyasuharenko/Desktop/capsule/.venv/lib/python3.13/site-packages/aiogram/client/session/base.py", line 120, in check_response
+    raise TelegramBadRequest(method=method, message=description)
+aiogram.exceptions.TelegramBadRequest: Telegram server says - Bad Request: chat not found. Еще раз проверь что совпадают данные. Ссылка на чат: t.me/capsoul_questions, id: 2356191665
+2) Добавление планировки:
+После нажатия на кнопку "нет" (больше не добавлять файлы) я вижу сообщение
+"Давайте подведем итоги...
+
+«Илья, вы записаны на экспресс-консультацию с ведущим дизайнером Алевтина.
+Дата консультации не указана, в не указано.
+
+Созвон пройдёт через Яндекс Телемост. Вам не нужно ничего
+устанавливать — просто перейдите по ссылке в указанное время:
+[ссылку я добавлю позже сам].
+
+Если у вас появятся вопросы до консультации, вы можете оставить сообщение в соответствующей вкладке. До встречи! 😊»"
+Я понимаю почему показывается это сообщение, но думаю что при добавлении файлов из главного меню оно выглядит лишним, плюс в его тексте есть ошибки. Соответсвенно нам нужно либо реализовать проекрку откуда выщывается функция добавления файлов, либо напиать ноую функцию добавления файлов, которая будет такая же как и старая, но не будет выводить последующее сообщение, и будет вызыватся только из "главного меню".

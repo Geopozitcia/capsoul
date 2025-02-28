@@ -22,7 +22,7 @@ from pathlib import Path
 import datetime
 import aiosqlite
 from pathlib import Path
-from keyboards.inline_kb import get_time_keyboard
+from keyboards.inline_kb import *
 from keyboards.reply_kb import *
 from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
 
@@ -44,6 +44,8 @@ class Form(StatesGroup):
     select_time = State()  # Новое состояние для выбора времени
     planning = State()  # Новое состояние для работы с планировкой
     more_files = State()  # Новое состояние для запроса дополнительных файлов
+    ask_question = State()
+    add_planning = State()
 
 
 @router.message(Command("start"))
@@ -72,7 +74,7 @@ async def start_handler(message: types.Message, state: FSMContext):
         else:
             await message.answer(
                 f"Здравствуйте, {name}. Что вы хотите сделать?",
-                reply_markup=ReplyKeyboardRemove()
+                reply_markup=get_main_menu_keyboard()  # Добавляем inline-кнопки
             )
 
 
@@ -458,22 +460,29 @@ async def more_files_no(message: types.Message, state: FSMContext):
     data = await state.get_data()
     user_id = message.from_user.id
     name = message.from_user.full_name
+
+    # Проверяем, есть ли дата консультации
     meeting_date = data.get("meeting_date")
+    if meeting_date:
+        meeting_date_formatted = datetime.datetime.strptime(meeting_date, "%Y-%m-%d").strftime("%d.%m.%Y")
+    else:
+        meeting_date_formatted = "не указана"
+
+    # Проверяем, есть ли время консультации
     meeting_time = data.get("meeting_time")
+    if meeting_time:
+        meeting_time_formatted = meeting_time
+    else:
+        meeting_time_formatted = "не указано"
 
-    # Форматируем дату и время
-    meeting_date_formatted = datetime.datetime.strptime(meeting_date, "%Y-%m-%d").strftime("%d.%m.%Y")
-    meeting_time_formatted = meeting_time
-
-    # Отправляем итоговое сообщение
     await message.answer(
         f"Давайте подведем итоги...\n\n"
         f"«{name}, вы записаны на экспресс-консультацию с ведущим дизайнером Алевтина.\n"
         f"Дата консультации {meeting_date_formatted}, в {meeting_time_formatted}.\n\n"
         f"Созвон пройдёт через Яндекс Телемост. Вам не нужно ничего\n"
         f"устанавливать — просто перейдите по ссылке в указанное время:\n"
-        f"[ССЫЛКА].\n\n"
-        f"Если у вас появятся вопросы до консультации, вы можете оставить сообщение в соответствующей вкладке. До встречи! 💋»",
+        f"[ссылку я добавлю позже сам].\n\n"
+        f"Если у вас появятся вопросы до консультации, вы можете оставить сообщение в соответствующей вкладке. До встречи! 😊»",
         reply_markup=get_continue_keyboard()
     )
     await state.clear()
@@ -482,3 +491,128 @@ async def more_files_no(message: types.Message, state: FSMContext):
 @router.message(F.text == "Продолжить")
 async def continue_handler(message: types.Message, state: FSMContext):
     await start_handler(message, state)  # Переход к началу работы бота
+
+@router.callback_query(F.data == "my_consultation")
+async def my_consultation(callback_query: CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
+    name = callback_query.from_user.full_name
+
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute("SELECT meeting_date, phone FROM users WHERE id = ?", (user_id,))
+        user_data = await cursor.fetchone()
+
+    if user_data and user_data[0]:
+        meeting_datetime = user_data[0]
+        meeting_date = datetime.datetime.fromisoformat(meeting_datetime).strftime("%d.%m.%Y")
+        meeting_time = datetime.datetime.fromisoformat(meeting_datetime).strftime("%H:%M")
+
+        await callback_query.message.answer(
+            f"«{name}, вы записаны на экспресс-консультацию с ведущим дизайнером Алевтина.\n"
+            f"Дата консультации {meeting_date}, в {meeting_time}.\n\n"
+            f"Созвон пройдёт через Яндекс Телемост. Вам не нужно ничего\n"
+            f"устанавливать — просто перейдите по ссылке в указанное время:\n"
+            f"[ссылку я добавлю позже сам].\n\n"
+            f"Если у вас появятся вопросы до консультации, вы можете оставить сообщение в соответствующей вкладке. До встречи! 😊»"
+        )
+    else:
+        await callback_query.message.answer("У вас нет активной записи на консультацию.")
+
+    # Возвращаем пользователя к главному меню
+    await callback_query.message.answer(
+        f"Здравствуйте, {name}. Что вы хотите сделать?",
+        reply_markup=get_main_menu_keyboard()
+    )
+
+@router.callback_query(F.data == "add_planning")
+async def add_planning(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.message.answer(
+        "Пожалуйста, отправьте файл с планировкой.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    await state.set_state(Form.add_planning)  # Новое состояние для добавления файлов из главного меню
+
+@router.callback_query(F.data == "ask_question")
+async def ask_question(callback_query: CallbackQuery, state: FSMContext):
+    await callback_query.message.answer(
+        "Пожалуйста, напишите ваш вопрос:",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    await state.set_state(Form.ask_question)
+
+@router.message(Form.ask_question)
+async def process_question(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    name = message.from_user.full_name
+    username = message.from_user.username
+    username = f"@{username}" if username else "Не указан"
+
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute("SELECT phone FROM users WHERE id = ?", (user_id,))
+        phone = await cursor.fetchone()
+        phone = phone[0] if phone else "Не указан"
+
+    # Пересылаем вопрос в чат
+    try:
+        await message.bot.send_message(
+            chat_id=-1002356191665,  # Используем ID чата с префиксом -100 для супергрупп
+            text=f"Пользователь {name} спрашивает: {message.text}\n"
+                 f"Телефон: {phone}\n"
+                 f"Никнейм пользователя: {username}"
+        )
+        await message.answer("Ваш вопрос отправлен. Мы свяжемся с вами в ближайшее время.")
+    except Exception as e:
+        await message.answer(f"Произошла ошибка при отправке вопроса: {e}")
+
+    # Возвращаем пользователя к главному меню
+    await message.answer(
+        f"Здравствуйте, {name}. Что вы хотите сделать?",
+        reply_markup=get_main_menu_keyboard()
+    )
+
+@router.message(Form.add_planning, F.document | F.photo)
+async def save_file_from_menu(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+
+    if message.document:
+        file_id = message.document.file_id
+        file_name = message.document.file_name  # Оригинальное имя файла
+    else:
+        file_id = message.photo[-1].file_id
+        file_name = f"photo_{file_id}.jpg"  # Если это фото, создаем имя на основе file_id
+
+    file = await message.bot.get_file(file_id)
+    file_path = file.file_path
+
+    # Создаем папку для пользователя, если она еще не существует
+    user_folder = Path(f"storage/user_files_{user_id}")
+    user_folder.mkdir(parents=True, exist_ok=True)
+
+    # Сохраняем файл в папку пользователя с оригинальным именем
+    await message.bot.download_file(file_path, user_folder / file_name)
+
+    # Сохраняем название папки в базу данных
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("""
+            UPDATE users SET planning_file = ? WHERE id = ?""",
+            (f"user_files_{user_id}", user_id)
+        )
+        await db.commit()
+
+    await message.answer(
+        "Файл успешно сохранён. Хотите ли вы прикрепить ещё файлы?",
+        reply_markup=get_more_files_keyboard()
+    )
+
+from aiogram.types import ReplyKeyboardRemove
+
+@router.message(Form.add_planning, F.text == "Нет")
+async def more_files_no_from_menu(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Спасибо, ваши файлы у нас.",
+        reply_markup=ReplyKeyboardRemove()  # Убираем reply-кнопки
+    )
+    await message.answer(
+        f"Здравствуйте, {message.from_user.full_name}. Что вы хотите сделать?",
+        reply_markup=get_main_menu_keyboard()  # Возвращаем пользователя к главному меню
+    )
+    await state.clear()
