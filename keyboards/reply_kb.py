@@ -1,11 +1,9 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-
 async def contact_keyboard():
     button = KeyboardButton(text="📱 Отправить контакт", request_contact=True)
     markup = ReplyKeyboardMarkup(keyboard=[[button]], resize_keyboard=True, one_time_keyboard=True)
     return markup
-
 
 def get_aim_keyboard():
     buttons = [
@@ -13,7 +11,6 @@ def get_aim_keyboard():
         [KeyboardButton(text="Для инвестиций (аренда, продажа)")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
-
 
 def get_experience_keyboard():
     buttons = [
@@ -23,7 +20,6 @@ def get_experience_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
-
 def get_team_keyboard():
     buttons = [
         [KeyboardButton(text="Да, есть проверенная команда")],
@@ -31,7 +27,6 @@ def get_team_keyboard():
         [KeyboardButton(text="Еще не думал(а) об этом")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
-
 
 def get_date_keyboard():
     buttons = [
@@ -42,7 +37,6 @@ def get_date_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
-
 def get_style_keyboard():
     buttons = [
         [KeyboardButton(text="Минимализм")],
@@ -51,10 +45,23 @@ def get_style_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
-
 def get_final_decision_keyboard():
     buttons = [
         [KeyboardButton(text="Мне нравятся эти решения")],
         [KeyboardButton(text="Думаю, мне нужно что-то более индивидуальное")]
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
+def get_planning_keyboard():
+    buttons = [
+        [KeyboardButton(text="Нет планировки")],
+        [KeyboardButton(text="Прикрепить файлы")]
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
+def get_more_files_keyboard():
+    buttons = [
+        [KeyboardButton(text="Да")],
+        [KeyboardButton(text="Нет")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)

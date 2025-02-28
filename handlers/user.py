@@ -4,7 +4,7 @@ from aiogram.types import ReplyKeyboardRemove, FSInputFile, InputMediaPhoto, Cal
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup 
 from aiogram.filters.callback_data import CallbackData
-import datetime
+from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
 
 
 from keyboards.reply_kb import (
@@ -17,10 +17,13 @@ from keyboards.reply_kb import (
     get_final_decision_keyboard
 )
 
+import os
+from pathlib import Path
+import datetime
 import aiosqlite
 from pathlib import Path
 from keyboards.inline_kb import get_time_keyboard
-from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
+from keyboards.reply_kb import *
 from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
 
 
@@ -29,7 +32,7 @@ router = Router()
 DB_NAME = "CAPSOUL.db"
 
 
-class Form(StatesGroup): # испольуется как буффер для решений
+class Form(StatesGroup):
     aim = State()
     experience = State()
     team = State()
@@ -39,6 +42,8 @@ class Form(StatesGroup): # испольуется как буффер для р�
     final_decision = State()  
     select_date = State()  # Новое состояние для выбора даты
     select_time = State()  # Новое состояние для выбора времени
+    planning = State()  # Новое состояние для работы с планировкой
+    more_files = State()  # Новое состояние для запроса дополнительных файлов
 
 
 @router.message(Command("start"))
@@ -349,6 +354,82 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.message.answer(
         f"Вы записаны на консультацию на {meeting_date} в {time}.\n"
         "Мы свяжемся с вами в ближайшее время для подтверждения.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
+    # Переходим к запросу планировки
+    await state.set_state(Form.planning)
+    await callback_query.message.answer(
+        "Отлично! Пожалуйста, прикрепите файл с планировкой квартиры. Это могут быть профессиональные чертежи, фото, или просто зарисовки.",
+        reply_markup=get_planning_keyboard()
+    )
+
+@router.message(Form.planning, F.text == "Нет планировки")
+async def no_planning(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("""
+            UPDATE users SET planning_file = ? WHERE id = ?""",
+            ("Нет планировки", user_id)
+        )
+        await db.commit()
+
+    await message.answer(
+        "Если у вас сейчас нет планировки, ничего страшного! Пожалуйста, постарайтесь найти её к моменту нашей консультации. "
+        "Планировка поможет нам лучше понять ваш запрос и сразу предложить подходящее решение. Если у вас не получится найти план, "
+        "мы всё равно сможем обсудить основные моменты на созвоне. 😊",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    await state.clear()
+
+@router.message(Form.planning, F.text == "Прикрепить файлы")
+async def attach_files(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Пожалуйста, отправьте файл с планировкой.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+    await state.set_state(Form.more_files)
+
+@router.message(Form.more_files, F.document | F.photo)
+async def save_file(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    file_id = message.document.file_id if message.document else message.photo[-1].file_id
+    file = await message.bot.get_file(file_id)
+    file_path = file.file_path
+    file_name = file_path.split("/")[-1]
+
+    # Создаем папку для пользователя, если она еще не существует
+    user_folder = Path(f"storage/user_files_{user_id}")
+    user_folder.mkdir(parents=True, exist_ok=True)
+
+    # Сохраняем файл в папку пользователя
+    await message.bot.download_file(file_path, user_folder / file_name)
+
+    # Сохраняем название папки в базу данных
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute("""
+            UPDATE users SET planning_file = ? WHERE id = ?""",
+            (f"user_files_{user_id}", user_id)
+        )
+        await db.commit()
+
+    await message.answer(
+        "Файл успешно сохранён. Хотите ли вы прикрепить ещё файлы?",
+        reply_markup=get_more_files_keyboard()
+    )
+
+@router.message(Form.more_files, F.text == "Да")
+async def more_files_yes(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Пожалуйста, отправьте следующий файл.",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
+@router.message(Form.more_files, F.text == "Нет")
+async def more_files_no(message: types.Message, state: FSMContext):
+    await message.answer(
+        "Спасибо, ваши файлы у нас.",
         reply_markup=ReplyKeyboardRemove()
     )
     await state.clear()
