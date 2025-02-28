@@ -65,3 +65,10 @@ def get_more_files_keyboard():
         [KeyboardButton(text="Нет")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
+def get_continue_keyboard():
+    buttons = [
+        [KeyboardButton(text="Продолжить")]
+    ]
+    return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+

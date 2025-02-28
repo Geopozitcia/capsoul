@@ -379,9 +379,10 @@ async def no_planning(message: types.Message, state: FSMContext):
         "Если у вас сейчас нет планировки, ничего страшного! Пожалуйста, постарайтесь найти её к моменту нашей консультации. "
         "Планировка поможет нам лучше понять ваш запрос и сразу предложить подходящее решение. Если у вас не получится найти план, "
         "мы всё равно сможем обсудить основные моменты на созвоне. 😊",
-        reply_markup=ReplyKeyboardRemove()
+        reply_markup=get_continue_keyboard()  # Добавляем кнопку "Продолжить"
     )
     await state.clear()
+
 
 @router.message(Form.planning, F.text == "Прикрепить файлы")
 async def attach_files(message: types.Message, state: FSMContext):
@@ -394,16 +395,22 @@ async def attach_files(message: types.Message, state: FSMContext):
 @router.message(Form.more_files, F.document | F.photo)
 async def save_file(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    file_id = message.document.file_id if message.document else message.photo[-1].file_id
+
+    if message.document:
+        file_id = message.document.file_id
+        file_name = message.document.file_name  # Оригинальное имя файла
+    else:
+        file_id = message.photo[-1].file_id
+        file_name = f"photo_{file_id}.jpg"  # Если это фото, создаем имя на основе file_id
+
     file = await message.bot.get_file(file_id)
     file_path = file.file_path
-    file_name = file_path.split("/")[-1]
 
     # Создаем папку для пользователя, если она еще не существует
     user_folder = Path(f"storage/user_files_{user_id}")
     user_folder.mkdir(parents=True, exist_ok=True)
 
-    # Сохраняем файл в папку пользователя
+    # Сохраняем файл в папку пользователя с оригинальным именем
     await message.bot.download_file(file_path, user_folder / file_name)
 
     # Сохраняем название папки в базу данных
@@ -430,6 +437,11 @@ async def more_files_yes(message: types.Message, state: FSMContext):
 async def more_files_no(message: types.Message, state: FSMContext):
     await message.answer(
         "Спасибо, ваши файлы у нас.",
-        reply_markup=ReplyKeyboardRemove()
+        reply_markup=get_continue_keyboard()  # Добавляем кнопку "Продолжить"
     )
     await state.clear()
+
+    
+@router.message(F.text == "Продолжить")
+async def continue_handler(message: types.Message, state: FSMContext):
+    await start_handler(message, state)  # Переход к началу работы бота
