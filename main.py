@@ -2,6 +2,7 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback
 from models.database import init_db
 from handlers.user import router as user_router
 
@@ -14,7 +15,7 @@ async def main():
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
-    await init_db()  # Инициализация базы данных
+    await init_db()  
     dp.include_router(user_router)
 
     try:
@@ -27,3 +28,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
