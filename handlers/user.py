@@ -21,10 +21,11 @@ from utilits.codes.google_calendar import authenticate_google_calendar, create_c
 
 router = Router()
 DB_NAME = "CAPSOUL.db"
+
 load_dotenv()
 VIDEO_CONFERENCE_LINK = os.getenv("VIDEO_CONFERENCE_LINK")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-
+ADMIN_ID = os.getenv("ADMIN_ID")
 
 class Form(StatesGroup):
     aim = State()
@@ -41,8 +42,6 @@ class Form(StatesGroup):
     ask_question = State()
     add_planning = State()
 
-
-ADMIN_ID = 665730970
 
 @router.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
