@@ -1,19 +1,17 @@
 import datetime
 import logging
+import os
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from dotenv import load_dotenv
 
-# Отключаем предупреждение о file_cache
+
+load_dotenv()
+SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE")
+
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
-
-# Путь к файлу ключа сервисного аккаунта
-SERVICE_ACCOUNT_FILE = "utilits/codes/key.json"
-
-# Идентификатор календаря
 CALENDAR_ID = "68b0899d698e09b08ca7bcbc1e02e699778cc6c65c04b747d138aecade045308@group.calendar.google.com"
-
-# Настройка временной зоны для Новосибирска (+7 часов от GMT)
 TIME_ZONE = "Asia/Novosibirsk"
 
 # Название события для рабочих слотов

@@ -12,14 +12,18 @@ from pathlib import Path
 import datetime
 import aiosqlite
 from pathlib import Path
+from dotenv import load_dotenv
+import os
 from keyboards.inline_kb import *
 from keyboards.reply_kb import *
 from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
 
 
 router = Router()
-
 DB_NAME = "CAPSOUL.db"
+load_dotenv()
+VIDEO_CONFERENCE_LINK = os.getenv("VIDEO_CONFERENCE_LINK")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 
 class Form(StatesGroup):
@@ -380,7 +384,7 @@ async def no_planning(message: types.Message, state: FSMContext):
         f"\nДата консультации {meeting_date_formatted}, в {meeting_time_formatted}.\n\n"
         f"Созвон пройдёт через Яндекс Телемост. Вам не нужно ничего\n"
         f"устанавливать — просто перейдите по ссылке в указанное время:"
-        f"\n\n[ССЫЛКА].\n\n"
+        f"\n\n{VIDEO_CONFERENCE_LINK}\n\n"
         f"Если у вас появятся вопросы до консультации, вы можете оставить сообщение в соответствующей вкладке. До встречи! 💋",
         reply_markup=get_continue_keyboard()
     )
@@ -459,7 +463,7 @@ async def more_files_no(message: types.Message, state: FSMContext):
         f"Дата консультации {meeting_date_formatted}, в {meeting_time_formatted}.\n"
         f"Созвон пройдёт через Яндекс Телемост. Вам не нужно ничего\n"
         f"устанавливать — просто перейдите по ссылке в указанное время:"
-        f"\n\n[ССЫЛКА].\n\n"
+        f"\n\n{VIDEO_CONFERENCE_LINK}\n\n"
         f"Если у вас появятся вопросы до консультации, вы можете оставить сообщение в соответствующей вкладке. До встречи! 💋",
         reply_markup=get_continue_keyboard()
     )
@@ -489,7 +493,7 @@ async def my_consultation(callback_query: CallbackQuery, state: FSMContext):
             f"Дата консультации {meeting_date}, в {meeting_time}.\n\n"
             f"Созвон пройдёт через Яндекс Телемост. Вам не нужно ничего\n"
             f"устанавливать — просто перейдите по ссылке в указанное время:"
-            f"\n\n[ССЫЛКА].\n\n"
+            f"\n\n{VIDEO_CONFERENCE_LINK}\n\n"
             f"Если у вас появятся вопросы до консультации, вы можете оставить сообщение в соответствующей вкладке. До встречи! 💋"
         )
     else:
@@ -531,7 +535,7 @@ async def process_question(message: types.Message, state: FSMContext):
     # Пересылаем вопрос в чат
     try:
         await message.bot.send_message(
-            chat_id=-1002356191665,  # Используем ID чата с префиксом -100 для супергрупп
+            chat_id=TELEGRAM_CHAT_ID,  
             text=f"Пользователь {name} спрашивает: {message.text}\n"
                  f"Телефон: {phone}\n"
                  f"Никнейм пользователя: {username}"
@@ -554,19 +558,16 @@ async def save_file_from_menu(message: types.Message, state: FSMContext):
         file_name = message.document.file_name  # Оригинальное имя файла
     else:
         file_id = message.photo[-1].file_id
-        file_name = f"photo_{file_id}.jpg"  # Если это фото, создаем имя на основе file_id
+        file_name = f"photo_{file_id}.jpg"  
 
     file = await message.bot.get_file(file_id)
     file_path = file.file_path
 
-    # Создаем папку для пользователя, если она еще не существует
     user_folder = Path(f"storage/user_files_{user_id}")
     user_folder.mkdir(parents=True, exist_ok=True)
 
-    # Сохраняем файл в папку пользователя с оригинальным именем
     await message.bot.download_file(file_path, user_folder / file_name)
 
-    # Сохраняем название папки в базу данных
     async with aiosqlite.connect(DB_NAME) as db:
         await db.execute("""
             UPDATE users SET planning_file = ? WHERE id = ?""",
@@ -597,5 +598,5 @@ async def more_files_no_from_menu(message: types.Message, state: FSMContext):
 async def more_files_yes_from_menu(message: types.Message, state: FSMContext):
     await message.answer(
         "Пожалуйста, отправьте следующий файл.",
-        reply_markup=ReplyKeyboardRemove()  # Убираем reply-кнопки
+        reply_markup=ReplyKeyboardRemove() 
     )
