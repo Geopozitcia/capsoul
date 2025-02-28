@@ -6,6 +6,7 @@ from models.database import DB_NAME
 import aiosqlite
 from datetime import datetime
 import asyncio
+import os
 from pathlib import Path
 from keyboards.reply_kb import get_more_files_keyboard, get_confirmation_keyboard
 from keyboards.inline_kb import admin_panel
@@ -13,9 +14,14 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import logging
 import sqlite3
+from dotenv import load_dotenv
+
 
 
 router = Router()
+load_dotenv()
+GSHEETS_LINK = os.getenv("GSHEETS_LINK")
+GCALENDAR_LINK = os.getenv("GCALENDAR_LINK")
 
 class ReminderState(StatesGroup):
     text = State()  # Состояние для ввода текста напоминания
@@ -246,3 +252,8 @@ async def sync_database_handler(callback_query: types.CallbackQuery):
     except Exception as e:
         logging.error(f"Ошибка при синхронизации: {e}", exc_info=True)
         await callback_query.message.answer(f"Ошибка при синхронизации: {e}", reply_markup=admin_panel())
+
+@router.callback_query(lambda c: c.data == "get_links")
+async def get_links(callback_query: types.CallbackQuery):
+     await callback_query.message.answer(f"Ссылка на Google Sheets: \n{GSHEETS_LINK}\n\n"
+                                         f"Ccылка еа Google Calendar: \n{GCALENDAR_LINK}")
