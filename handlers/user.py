@@ -280,15 +280,16 @@ async def final_decision(message: types.Message, state: FSMContext):
     await state.set_state(Form.select_date)
 
 # Обработка выбора даты
+# Обработка выбора даты
 @router.callback_query(SimpleCalendarCallback.filter(), Form.select_date)
 async def process_calendar(callback_query: CallbackQuery, callback_data: CallbackData, state: FSMContext):
     selected, date = await SimpleCalendar(locale="ru_RU").process_selection(callback_query, callback_data)
     
     if selected:
-        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  # Текущее время в Новосибирске
-        if date.date() < now.date() or (date.date() == now.date() and date.time() < now.time()):
+        now = datetime.datetime.now()  # Текущее время без привязки к временной зоне
+        if date.date() < now.date():
             await callback_query.message.answer(
-                "Вы выбрали прошедшую дату или время. Пожалуйста, выберите будущую дату.",
+                "Вы выбрали прошедшую дату. Пожалуйста, выберите будущую дату.",
                 reply_markup=await SimpleCalendar(locale="ru_RU").start_calendar()  
             )
             return
@@ -321,7 +322,6 @@ async def process_calendar(callback_query: CallbackQuery, callback_data: Callbac
         )
 
 # Обработка выбора времени
-# Обработка выбора времени
 @router.callback_query(Form.select_time, F.data.startswith("time_"))
 async def process_time(callback_query: CallbackQuery, state: FSMContext):
     time = callback_query.data.split("_")[1]  
@@ -336,7 +336,7 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     user_id = callback_query.from_user.id
     meeting_date = data['meeting_date']
-    meeting_datetime = f"{meeting_date}T{time}:00+07:00"  # Новосибирское время
+    meeting_datetime = f"{meeting_date}T{time}:00"  # Время без временной зоны
 
     # Шаг 2: Ожидаем выполнение всех операций записи
     async with aiosqlite.connect(DB_NAME) as db:
