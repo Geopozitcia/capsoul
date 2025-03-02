@@ -6,7 +6,6 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.filters.callback_data import CallbackData
 from aiogram_calendar import SimpleCalendar, SimpleCalendarCallback 
 
-
 import os
 from pathlib import Path
 import datetime
@@ -18,14 +17,13 @@ from keyboards.inline_kb import *
 from keyboards.reply_kb import *
 from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
 
-
 router = Router()
 DB_NAME = "CAPSOUL.db"
 
 load_dotenv()
 VIDEO_CONFERENCE_LINK = os.getenv("VIDEO_CONFERENCE_LINK")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-ADMIN_ID = os.getenv("ADMIN_ID")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))  # Преобразуем в число
 
 class Form(StatesGroup):
     aim = State()
@@ -41,7 +39,6 @@ class Form(StatesGroup):
     more_files = State()  
     ask_question = State()
     add_planning = State()
-
 
 @router.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
@@ -60,7 +57,7 @@ async def start_handler(message: types.Message, state: FSMContext):
                 VALUES (?, ?, ?, ?)""", (user_id, name, username, ""))
             await db.commit()
 
-        if user_id == ADMIN_ID:
+        if user_id == ADMIN_ID:  # Теперь сравнение работает корректно
             await message.answer(
                 "Здравствуйте, Алевтина!",
                 reply_markup=admin_panel()
@@ -76,7 +73,6 @@ async def start_handler(message: types.Message, state: FSMContext):
                 f"Здравствуйте, {name}. Что вы хотите сделать?",
                 reply_markup=get_main_menu_keyboard()
             )
-
 
 @router.message(F.content_type == types.ContentType.CONTACT)
 async def get_contact(message: types.Message, state: FSMContext):
