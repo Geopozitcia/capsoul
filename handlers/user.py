@@ -385,14 +385,17 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
     service = authenticate_google_calendar()
     create_calendar_event(service, user_data, meeting_datetime)
 
-    # Шаг 3: Сообщаем пользователю, что запись завершена
+    # Шаг 3: Отправляем уведомление в групповой чат
+    await send_consultation_notification(callback_query.bot, user_id, meeting_datetime)
+
+    # Шаг 4: Сообщаем пользователю, что запись завершена
     await callback_query.message.answer(
-        f"Мы провели вашу запись на консультацию: {meeting_date} в {time}.\n"
+        f"Готово! Консультация пройдет {meeting_date} в {time}.\n"
         "Теперь давайте перейдем к следующему шагу.", 
         reply_markup=ReplyKeyboardRemove()
     )
 
-    # Шаг 4: Запрос на прикрепление файла с планировкой
+    # Шаг 5: Запрос на прикрепление файла с планировкой
     await state.set_state(Form.planning)
     await callback_query.message.answer(
         "Пожалуйста, прикрепите файл с планировкой (это может быть фото, скан или PDF).\n"
@@ -567,6 +570,39 @@ async def ask_question(callback_query: CallbackQuery, state: FSMContext):
     )
     await state.set_state(Form.ask_question)
 
+async def send_consultation_notification(bot, user_id, meeting_datetime):
+    """Отправляет уведомление о новой записи на консультацию в групповой чат."""
+    async with aiosqlite.connect(DB_NAME) as db:
+        cursor = await db.execute(
+            "SELECT name, user_name, phone FROM users WHERE id = ?", 
+            (user_id,)
+        )
+        user_data = await cursor.fetchone()
+
+    if user_data:
+        name, username, phone = user_data
+        username = f"@{username}" if username else "Не указан"
+        phone = phone if phone else "Не указан"
+
+        # Форматируем дату и время
+        meeting_datetime_formatted = datetime.datetime.fromisoformat(meeting_datetime).strftime("%d.%m.%Y в %H:%M")
+
+        # Отправляем сообщение в групповой чат
+        try:
+            await bot.send_message(
+                chat_id=TELEGRAM_CHAT_ID,  # ID группового чата
+                text=f"Новая запись на консультацию.\n\n"
+                     f"👤 Имя: {name}\n"
+                     f"📞 Телефон: {phone}\n"
+                     f"📅 Дата и время: {meeting_datetime_formatted}\n"
+                     f"👤 Никнейм: {username}\n\n"
+                     f"#заявки"
+            )
+        except Exception as e:
+            print(f"Ошибка при отправке уведомления: {e}")
+    else:
+        print("Пользователь не найден в базе данных.")
+
 @router.message(Form.ask_question)
 async def process_question(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
@@ -583,9 +619,10 @@ async def process_question(message: types.Message, state: FSMContext):
     try:
         await message.bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,  
-            text=f"Пользователь {name} спрашивает: {message.text}\n"
-                 f"Телефон: {phone}\n"
-                 f"Никнейм пользователя: {username}"
+            text=f"Пользователь {name} спрашивает:\n{message.text}\n"
+                 f"📞 Телефон: {phone}\n"
+                 f"👤 Никнейм пользователя: {username}"
+                 f"\n\n#вопросы"
         )
         await message.answer("Ваш вопрос отправлен. Мы свяжемся с вами в ближайшее время.")
     except Exception as e:
