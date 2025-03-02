@@ -8,10 +8,8 @@ from handlers.admin import router as admin_router
 from dotenv import load_dotenv
 import os
 
-# Загружаем переменные окружения из .env файла
 load_dotenv()
 
-# Получаем значения из переменных окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 async def main():

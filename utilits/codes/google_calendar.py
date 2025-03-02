@@ -14,7 +14,6 @@ logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 CALENDAR_ID = "68b0899d698e09b08ca7bcbc1e02e699778cc6c65c04b747d138aecade045308@group.calendar.google.com"
 TIME_ZONE = "Asia/Novosibirsk"
 
-# Название события для рабочих слотов
 WORK_SLOT_EVENT_NAME = "Время для консультаций"
 
 
@@ -52,37 +51,33 @@ def is_time_available(service, date, time):
     target_start = f"{date}T{time}:00+07:00"
     target_end = (datetime.datetime.fromisoformat(target_start) + datetime.timedelta(hours=1)).isoformat()
 
-    # Проверяем, есть ли рабочий слот, который покрывает выбранное время
     has_work_slot = False
     for event in events:
         event_start = event["start"].get("dateTime", event["start"].get("date"))
         event_end = event["end"].get("dateTime", event["end"].get("date"))
 
         if event["summary"] == WORK_SLOT_EVENT_NAME:
-            # Проверяем, полностью ли выбранное время находится внутри рабочего слота
             if event_start <= target_start and event_end >= target_end:
                 has_work_slot = True
                 break
 
     if not has_work_slot:
-        return False  # Нет рабочего слота, покрывающего выбранное время
+        return False  
 
-    # Проверяем, нет ли других событий, которые пересекаются с выбранным временем
     for event in events:
         event_start = event["start"].get("dateTime", event["start"].get("date"))
         event_end = event["end"].get("dateTime", event["end"].get("date"))
 
         if event["summary"] != WORK_SLOT_EVENT_NAME:
-            # Проверяем, пересекается ли выбранное время с другими событиями
             if (event_start < target_end) and (event_end > target_start):
-                return False  # Время занято другим событием
+                return False  
 
-    return True  # Время доступно для записи
+    return True  
 
 def find_nearest_available_day(service):
     """Находит ближайший день с рабочими слотами."""
-    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  # Текущее время в Новосибирске
-    for delta in range(0, 30):  # Проверяем ближайшие 30 дней
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  
+    for delta in range(0, 30):  
         target_date = (now + datetime.timedelta(days=delta)).strftime("%Y-%m-%d")
         events = get_events_for_date(service, target_date)
         if any(event["summary"] == WORK_SLOT_EVENT_NAME for event in events):
@@ -138,15 +133,14 @@ def get_available_times_for_date(service, date):
     ]
 
     available_times = []
-    current_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  # Текущее время в Новосибирске
+    current_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  
 
     for time in all_times:
         target_start = f"{date}T{time}:00+07:00"
         target_start_dt = datetime.datetime.fromisoformat(target_start)
 
-        # Проверяем, не прошло ли уже это время
         if target_start_dt < current_time:
-            continue  # Пропускаем прошедшее время
+            continue  
 
         target_end = (target_start_dt + datetime.timedelta(minutes=30)).isoformat()
 
@@ -155,13 +149,11 @@ def get_available_times_for_date(service, date):
             event_start = event["start"].get("dateTime", event["start"].get("date"))
             event_end = event["end"].get("dateTime", event["end"].get("date"))
 
-            # Проверяем, пересекается ли выбранное время с существующими событиями
             if (event_start < target_end) and (event_end > target_start):
                 if event["summary"] != WORK_SLOT_EVENT_NAME:
                     is_available = False
                     break
 
-        # Проверяем, есть ли рабочий слот в это время
         if is_available:
             for event in events:
                 event_start = event["start"].get("dateTime", event["start"].get("date"))

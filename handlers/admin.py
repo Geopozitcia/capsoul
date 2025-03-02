@@ -53,26 +53,21 @@ async def process_remainder_text(message: Message, state: FSMContext):
 @router.message(ReminderState.time)
 async def process_remainder_time(message: Message, state: FSMContext, bot: Bot):
     try:
-        # Парсим введенное время
         reminder_time = datetime.strptime(message.text, "%d.%m.%Y %H:%M")
         current_time = datetime.now()
 
-        # Проверяем, что время в будущем
         if reminder_time <= current_time:
             await message.answer("Время должно быть в будущем. Попробуйте снова.")
             return
 
-        # Получаем текст из состояния
         data = await state.get_data()
         reminder_text = data.get("text")
 
-        # Сохраняем время и текст в состоянии
         await state.update_data(time=reminder_time, text=reminder_text)
 
-        # Спрашиваем, хочет ли админ приложить фотографию
         await message.answer(
             "Хотите приложить фотографию?",
-            reply_markup=get_more_files_keyboard()  # Используем reply-кнопки
+            reply_markup=get_more_files_keyboard() 
         )
         await state.set_state(ReminderState.photo)
 
@@ -81,22 +76,19 @@ async def process_remainder_time(message: Message, state: FSMContext, bot: Bot):
 
 @router.message(ReminderState.photo)
 async def process_remainder_photo(message: Message, state: FSMContext, bot: Bot):
-    # Если админ отправляет фотографию
     if message.photo:
-        # Сохраняем фотографию
+        
         photo_id = message.photo[-1].file_id
         photo_file = await bot.get_file(photo_id)
         photo_path = Path("utilits/images/remainders") / f"{photo_id}.jpg"
         await bot.download_file(photo_file.file_path, destination=photo_path)
 
-        # Сохраняем путь к фотографии в состоянии
         await state.update_data(photo=str(photo_path))
 
         data = await state.get_data()
         reminder_text = data.get("text")
         reminder_time = data.get("time")
 
-        # Показываем предварительный просмотр напоминания
         await message.answer(
             f"Это ваше напоминание:\n\n"
             f"Текст: {reminder_text}\n"
@@ -105,7 +97,6 @@ async def process_remainder_photo(message: Message, state: FSMContext, bot: Bot)
             reply_markup=get_confirmation_keyboard()  # Новые кнопки для подтверждения
         )
         await state.set_state(ReminderState.confirm)
-    # Если админ выбирает "Да" или "Нет"
     elif message.text in ["Да", "Нет"]:
         if message.text == "Да":
             await message.answer("Отправьте фотографию.")
@@ -114,13 +105,12 @@ async def process_remainder_photo(message: Message, state: FSMContext, bot: Bot)
             reminder_text = data.get("text")
             reminder_time = data.get("time")
 
-            # Показываем предварительный просмотр напоминания
             await message.answer(
                 f"Это ваше напоминание:\n\n"
                 f"Текст: {reminder_text}\n"
                 f"Дата: {reminder_time.strftime('%d.%m.%Y %H:%M')}\n\n"
                 f"Хотите что-нибудь изменить или отменить отправку напоминания?",
-                reply_markup=get_confirmation_keyboard()  # Новые кнопки для подтверждения
+                reply_markup=get_confirmation_keyboard() 
             )
             await state.set_state(ReminderState.confirm)
     else:
@@ -193,7 +183,7 @@ async def process_get_planfiles_phone(message: Message, state: FSMContext):
 
 async def send_remainder_to_all(bot: Bot, text: str, delay: float, photo_path: str = None):
     """Отправляет напоминание всем пользователям через указанное время."""
-    await asyncio.sleep(delay)  # Ждем указанное время
+    await asyncio.sleep(delay)  
 
     async with aiosqlite.connect(DB_NAME) as db:
         cursor = await db.execute("SELECT id FROM users")
@@ -203,7 +193,6 @@ async def send_remainder_to_all(bot: Bot, text: str, delay: float, photo_path: s
             user_id = user[0]
             try:
                 if photo_path:
-                    # Отправляем фотографию из локального файла
                     await bot.send_photo(user_id, FSInputFile(photo_path), caption=text)
                 else:
                     await bot.send_message(user_id, text)
@@ -213,28 +202,22 @@ async def send_remainder_to_all(bot: Bot, text: str, delay: float, photo_path: s
 def sync_database_to_google_sheets_sync():
     """Синхронная версия функции синхронизации."""
     try:
-        # Настройка аутентификации
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_name("utilits/codes/key.json", scope)
         client = gspread.authorize(creds)
 
-        # Открываем таблицу по ID
         sheet = client.open_by_key("1jFnTiutAYa1C1PQV0VnYgtu-q033aKdnIs1WVBQrxOk")
-        worksheet = sheet.get_worksheet(0)  # Выбираем первый лист
+        worksheet = sheet.get_worksheet(0)  
 
-        # Очищаем лист перед записью новых данных
         worksheet.clear()
 
-        # Читаем данные из базы данных
         with sqlite3.connect(DB_NAME) as db:
             cursor = db.execute("SELECT * FROM users")
             users = cursor.fetchall()
 
-            # Записываем заголовки столбцов
             headers = ["ID", "Name", "Phone", "Username", "Aim of Project", "Past Experience", "Team Exist", "Date of Project", "Design Preferences", "Meeting Date", "Planning File"]
             worksheet.append_row(headers)
 
-            # Записываем данные
             for user in users:
                 worksheet.append_row(user)
     except Exception as e:

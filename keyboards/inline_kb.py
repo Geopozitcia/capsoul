@@ -8,7 +8,6 @@ def get_time_keyboard(date):
     service = authenticate_google_calendar()
     available_times = get_available_times_for_date(service, date)
 
-    # Создаем кнопки для доступного времени
     buttons = []
     for i in range(0, len(available_times), 2): 
         row = [

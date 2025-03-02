@@ -23,7 +23,7 @@ DB_NAME = "CAPSOUL.db"
 load_dotenv()
 VIDEO_CONFERENCE_LINK = os.getenv("VIDEO_CONFERENCE_LINK")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-ADMIN_ID = int(os.getenv("ADMIN_ID"))  # Преобразуем в число
+ADMIN_ID = int(os.getenv("ADMIN_ID")) 
 
 class Form(StatesGroup):
     aim = State()
@@ -57,7 +57,7 @@ async def start_handler(message: types.Message, state: FSMContext):
                 VALUES (?, ?, ?, ?)""", (user_id, name, username, ""))
             await db.commit()
 
-        if user_id == ADMIN_ID:  # Теперь сравнение работает корректно
+        if user_id == ADMIN_ID:  
             await message.answer(
                 "Здравствуйте, Алевтина!",
                 reply_markup=admin_panel()
@@ -294,7 +294,6 @@ async def process_calendar(callback_query: CallbackQuery, callback_data: Callbac
 
         await state.update_data(meeting_date=date.strftime("%Y-%m-%d"))  
 
-        # Удаляем календарь и отправляем сообщение "Ищем время сеансов..."
         await callback_query.message.answer(
             "Ищем время сеансов...", 
             reply_markup=ReplyKeyboardRemove()  # Убираем клавиатуру
@@ -323,7 +322,6 @@ async def process_calendar(callback_query: CallbackQuery, callback_data: Callbac
             )
             return
 
-        # Отправляем пользователю запрос на выбор времени
         await state.set_state(Form.select_time)
         await callback_query.message.answer(
             "Теперь выберите время консультации:",
@@ -336,30 +334,27 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
     time = callback_query.data.split("_")[1]  
     data = await state.get_data()
     meeting_date = data['meeting_date']
-    meeting_datetime = f"{meeting_date}T{time}:00+07:00"  # Учитываем временную зону
+    meeting_datetime = f"{meeting_date}T{time}:00+07:00"  
 
     current_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  # Текущее время в Новосибирске
     target_start_dt = datetime.datetime.fromisoformat(meeting_datetime)
 
-    # Проверяем, не прошло ли уже это время
     if target_start_dt < current_time:
         await callback_query.message.answer(
             "Вы выбрали прошедшее время. Пожалуйста, выберите другое время.",
-            reply_markup=get_time_keyboard(meeting_date)  # Показываем клавиатуру с доступным временем снова
+            reply_markup=get_time_keyboard(meeting_date) 
         )
         return
 
     await state.update_data(meeting_time=time) 
 
-    # Шаг 1: Отправляем промежуточное сообщение "Записываем вас..."
     await callback_query.message.answer(
         "Записываем вас...",
-        reply_markup=ReplyKeyboardRemove()  # Убираем клавиатуру, чтобы было видно сообщение
+        reply_markup=ReplyKeyboardRemove()  
     )
 
     user_id = callback_query.from_user.id
 
-    # Шаг 2: Ожидаем выполнение всех операций записи
     async with aiosqlite.connect(DB_NAME) as db:
         cursor = await db.execute("SELECT phone, aim_of_project, past_experience, team_exist, date_of_project, design_preferences FROM users WHERE id = ?", (user_id,))
         user_data_db = await cursor.fetchone()
@@ -381,21 +376,17 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
         )
         await db.commit()
 
-    # Создаем событие в календаре
     service = authenticate_google_calendar()
     create_calendar_event(service, user_data, meeting_datetime)
 
-    # Шаг 3: Отправляем уведомление в групповой чат
     await send_consultation_notification(callback_query.bot, user_id, meeting_datetime)
 
-    # Шаг 4: Сообщаем пользователю, что запись завершена
     await callback_query.message.answer(
         f"Готово! Консультация пройдет {meeting_date} в {time}.\n"
         "Теперь давайте перейдем к следующему шагу.", 
         reply_markup=ReplyKeyboardRemove()
     )
 
-    # Шаг 5: Запрос на прикрепление файла с планировкой
     await state.set_state(Form.planning)
     await callback_query.message.answer(
         "Пожалуйста, прикрепите файл с планировкой (это может быть фото, скан или PDF).\n"
@@ -584,10 +575,8 @@ async def send_consultation_notification(bot, user_id, meeting_datetime):
         username = f"@{username}" if username else "Не указан"
         phone = phone if phone else "Не указан"
 
-        # Форматируем дату и время
         meeting_datetime_formatted = datetime.datetime.fromisoformat(meeting_datetime).strftime("%d.%m.%Y в %H:%M")
 
-        # Отправляем сообщение в групповой чат
         try:
             await bot.send_message(
                 chat_id=TELEGRAM_CHAT_ID,  # ID группового чата
@@ -615,7 +604,6 @@ async def process_question(message: types.Message, state: FSMContext):
         phone = await cursor.fetchone()
         phone = phone[0] if phone else "Не указан"
 
-    # Пересылаем вопрос в чат
     try:
         await message.bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,  
