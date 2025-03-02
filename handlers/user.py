@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 import os
 from keyboards.inline_kb import *
 from keyboards.reply_kb import *
-from utilits.codes.google_calendar import authenticate_google_calendar, create_calendar_event, is_time_available, find_nearest_available_day, get_events_for_date, WORK_SLOT_EVENT_NAME
+from utilits.codes.google_calendar import *
 
 router = Router()
 DB_NAME = "CAPSOUL.db"
@@ -276,13 +276,15 @@ async def final_decision(message: types.Message, state: FSMContext):
     await state.set_state(Form.select_date)
 
 # Обработка выбора даты
-# Обработка выбора даты
+
 @router.callback_query(SimpleCalendarCallback.filter(), Form.select_date)
 async def process_calendar(callback_query: CallbackQuery, callback_data: CallbackData, state: FSMContext):
     selected, date = await SimpleCalendar(locale="ru_RU").process_selection(callback_query, callback_data)
     
     if selected:
-        now = datetime.datetime.now()  # Текущее время без привязки к временной зоне
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  # Текущее время в Новосибирске
+
+        # Проверяем, не выбрана ли прошедшая дата
         if date.date() < now.date():
             await callback_query.message.answer(
                 "Вы выбрали прошедшую дату. Пожалуйста, выберите будущую дату.",
@@ -310,6 +312,17 @@ async def process_calendar(callback_query: CallbackQuery, callback_data: Callbac
             )
             return
 
+        # Получаем доступное время для выбранного дня
+        available_times = get_available_times_for_date(service, date.strftime("%Y-%m-%d"))
+
+        # Если на выбранный день нет доступного времени
+        if not available_times:
+            await callback_query.message.answer(
+                "На выбранный день нет доступного времени для консультаций. Пожалуйста, выберите другой день.",
+                reply_markup=await SimpleCalendar(locale="ru_RU").start_calendar()  # Показываем календарь снова
+            )
+            return
+
         # Отправляем пользователю запрос на выбор времени
         await state.set_state(Form.select_time)
         await callback_query.message.answer(
@@ -321,6 +334,21 @@ async def process_calendar(callback_query: CallbackQuery, callback_data: Callbac
 @router.callback_query(Form.select_time, F.data.startswith("time_"))
 async def process_time(callback_query: CallbackQuery, state: FSMContext):
     time = callback_query.data.split("_")[1]  
+    data = await state.get_data()
+    meeting_date = data['meeting_date']
+    meeting_datetime = f"{meeting_date}T{time}:00+07:00"  # Учитываем временную зону
+
+    current_time = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=7)))  # Текущее время в Новосибирске
+    target_start_dt = datetime.datetime.fromisoformat(meeting_datetime)
+
+    # Проверяем, не прошло ли уже это время
+    if target_start_dt < current_time:
+        await callback_query.message.answer(
+            "Вы выбрали прошедшее время. Пожалуйста, выберите другое время.",
+            reply_markup=get_time_keyboard(meeting_date)  # Показываем клавиатуру с доступным временем снова
+        )
+        return
+
     await state.update_data(meeting_time=time) 
 
     # Шаг 1: Отправляем промежуточное сообщение "Записываем вас..."
@@ -329,10 +357,7 @@ async def process_time(callback_query: CallbackQuery, state: FSMContext):
         reply_markup=ReplyKeyboardRemove()  # Убираем клавиатуру, чтобы было видно сообщение
     )
 
-    data = await state.get_data()
     user_id = callback_query.from_user.id
-    meeting_date = data['meeting_date']
-    meeting_datetime = f"{meeting_date}T{time}:00"  # Время без временной зоны
 
     # Шаг 2: Ожидаем выполнение всех операций записи
     async with aiosqlite.connect(DB_NAME) as db:
