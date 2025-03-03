@@ -240,3 +240,4 @@ async def sync_database_handler(callback_query: types.CallbackQuery):
 async def get_links(callback_query: types.CallbackQuery):
      await callback_query.message.answer(f"Ссылка на Google Sheets: \n{GSHEETS_LINK}\n\n"
                                          f"Ccылка еа Google Calendar: \n{GCALENDAR_LINK}")
+     #
