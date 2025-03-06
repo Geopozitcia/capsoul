@@ -184,25 +184,23 @@ async def process_date(message: types.Message, state: FSMContext):
         reply_markup=ReplyKeyboardRemove()
     )
 
+    first_examples_path = Path("utilits/images/first_examples")
 
-    minimalism_photo = FSInputFile("utilits/images/minimalism.png")
-    modern_classic_photo = FSInputFile("utilits/images/modern_classic.jpg")
-    scandi_photo = FSInputFile("utilits/images/sсandi.jpg")
+    minimalism_photos = [FSInputFile(str(first_examples_path / "minimalism_1" / f"image_{i}.jpg")) for i in range(1, 8)]
+    modern_classic_photos = [FSInputFile(str(first_examples_path / "modern_1" / f"image_{i}.jpg")) for i in range(1, 8)]
+    scandi_photos = [FSInputFile(str(first_examples_path / "scandi_1" / f"image_{i}.jpg")) for i in range(1, 8)]
 
-    await message.answer_photo(
-        photo=minimalism_photo,
-        caption="🎨 Минимализм — для тех, кто ценит простоту, порядок и функциональность."
-    )
+    media_minimalism = [InputMediaPhoto(media=photo) for photo in minimalism_photos]
+    await message.answer_media_group(media=media_minimalism)
+    await message.answer("Первый стиль - для тех, кто ценит простоту, порядок и функциональность.")
 
-    await message.answer_photo(
-        photo=modern_classic_photo,
-        caption="✨ Современная классика — для тех, кто любит элегантность, уют и вечную актуальность."
-    )
+    media_modern_classic = [InputMediaPhoto(media=photo) for photo in modern_classic_photos]
+    await message.answer_media_group(media=media_modern_classic)
+    await message.answer("Второй стиль - для тех, кто любит элегантность, уют и вечную актуальность.")
 
-    await message.answer_photo(
-        photo=scandi_photo,
-        caption="🪵 Скандинавский стиль — для тех, кто хочет создать светлое, тёплое и комфортное пространство."
-    )
+    media_scandi = [InputMediaPhoto(media=photo) for photo in scandi_photos]
+    await message.answer_media_group(media=media_scandi)
+    await message.answer("Третий стиль - для тех, кто хочет создать светлое, тёплое и комфортное пространство.")
 
     await state.set_state(Form.style)
     await message.answer(
@@ -210,10 +208,21 @@ async def process_date(message: types.Message, state: FSMContext):
         reply_markup=get_style_keyboard()
     )
 
-
 @router.message(Form.style)
 async def process_style(message: types.Message, state: FSMContext):
-    style = message.text
+    style_mapping = {
+        "Первый вариант": "Минимализм",
+        "Второй вариант": "Современная классика",
+        "Третий вариант": "Скандинавский стиль",
+    }
+
+    selected_option = message.text
+    style = style_mapping.get(selected_option)
+
+    if not style:
+        await message.answer("Пожалуйста, выберите стиль, используя кнопки ниже.", reply_markup=get_style_keyboard())
+        return
+
     await state.update_data(style=style)
 
     data = await state.get_data()
@@ -232,19 +241,23 @@ async def process_style(message: types.Message, state: FSMContext):
         )
         await db.commit()
 
-    images_path = Path("utilits/images")
-    style_images = {
-        "Минимализм": ["example_minimalism1.jpg", "example_minimalism2.jpg", "example_minimalism3.jpg"],
-        "Современная классика": ["example_modern_classic1.jpg", "example_modern_classic2.jpg", "example_modern_classic3.jpg"],
-        "Скандинавский стиль": ["example_scandi1.jpg", "example_scandi2.jpg", "example_scandi3.jpg"]
-    }
+    second_examples_path = Path("utilits/images/second_examples")
+
+    style_subfolder = {
+        "Минимализм": "minimalism_2",
+        "Современная классика": "modern_2",
+        "Скандинавский стиль": "scandi_2",
+    }[style]
+
+    style_images = [FSInputFile(str(second_examples_path / style_subfolder / f"image_{i}.jpg")) for i in range(1, 11)]
+
     descriptions = {
-        "Минимализм": "Минимализм — это стиль вне времени для тех, кто ценит порядок, функциональность, чистоту линий и свободу пространства. Ничего лишнего, только комфорт и современный дизайн. Особенно это ценно в нашем современном мире, где много лишних вещей, шума и суеты.",
-        "Современная классика": "Современная классика — это сочетание уюта, мягкости и элегантности. Интерьер, который выглядит стильно сегодня и останется актуальным завтра.",
-        "Скандинавский стиль": "Скандинавский стиль — это выбор для тех, кто ценит натуральные материалы, функциональность и хорошую простоту. В таком доме тепло и легко дышится."
+        "Минимализм": "🎨 Минимализм — это стиль вне времени для тех, кто ценит порядок, функциональность, чистоту линий и свободу пространства. Ничего лишнего, только комфорт и современный дизайн. Особенно это ценно в нашем современном мире, где много лишних вещей, шума и суеты.",
+        "Современная классика": "✨ Современная классика — это сочетание уюта, мягкости и элегантности. Интерьер, который выглядит стильно сегодня и останется актуальным завтра.",
+        "Скандинавский стиль": "🪵 Скандинавский стиль — это выбор для тех, кто ценит натуральные материалы, функциональность и хорошую простоту. В таком доме тепло и легко дышится."
     }
 
-    media = [InputMediaPhoto(media=FSInputFile(images_path / image_name)) for image_name in style_images[style]]
+    media = [InputMediaPhoto(media=photo) for photo in style_images]
     await message.answer_media_group(media=media)
 
     await message.answer(descriptions[style])

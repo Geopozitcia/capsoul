@@ -39,9 +39,9 @@ def get_date_keyboard():
 
 def get_style_keyboard():
     buttons = [
-        [KeyboardButton(text="Минимализм")],
-        [KeyboardButton(text="Современная классика")],
-        [KeyboardButton(text="Скандинавский стиль")]
+        [KeyboardButton(text="Первый вариант")],
+        [KeyboardButton(text="Второй вариант")],
+        [KeyboardButton(text="Третий вариант")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
