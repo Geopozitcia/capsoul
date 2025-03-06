@@ -42,6 +42,13 @@ class Form(StatesGroup):
 
 @router.message(Command("start"))
 async def start_handler(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    
+    # Если пользователь уже находится в процессе анкетирования, игнорируем команду /start
+    if current_state is not None:
+        await message.answer("Пожалуйста, завершите текущее анкетирование перед началом нового.")
+        return
+    
     user_id = message.from_user.id
     name = message.from_user.full_name
     username = message.from_user.username
